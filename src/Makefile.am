@@ -21,49 +21,51 @@
 
 LUA_ENV = LUA_INIT= LUA_PATH="$(srcdir)/?.lua"
 
-bin_SCRIPTS = zile
+bin_SCRIPTS = src/zile
 
-zile_LUA =						\
-	lib.lua						\
-	history.lua					\
-	lisp.lua					\
-	tbl_vars.lua					\
-	variables.lua					\
-	main.lua					\
-	basic.lua					\
-	bind.lua					\
-	buffer.lua					\
-	completion.lua					\
-	editfns.lua					\
-	funcs.lua					\
-	getkey.lua					\
-	help.lua					\
-	file.lua					\
-	keycode.lua					\
-	killring.lua					\
-	line.lua					\
-	macro.lua					\
-	marker.lua					\
-	minibuf.lua					\
-	point.lua					\
-	redisplay.lua					\
-	registers.lua					\
-	search.lua					\
-	undo.lua					\
-	window.lua					\
-	term_curses.lua					\
-	term_minibuf.lua				\
-	term_redisplay.lua
+BUILT_SOURCES = src/loadlua.lua
+
+src_zile_LUA =						\
+	src/lib.lua						\
+	src/history.lua					\
+	src/lisp.lua					\
+	src/tbl_vars.lua					\
+	src/variables.lua					\
+	src/main.lua					\
+	src/basic.lua					\
+	src/bind.lua					\
+	src/buffer.lua					\
+	src/completion.lua					\
+	src/editfns.lua					\
+	src/funcs.lua					\
+	src/getkey.lua					\
+	src/help.lua					\
+	src/file.lua					\
+	src/keycode.lua					\
+	src/killring.lua					\
+	src/line.lua					\
+	src/macro.lua					\
+	src/marker.lua					\
+	src/minibuf.lua					\
+	src/point.lua					\
+	src/redisplay.lua					\
+	src/registers.lua					\
+	src/search.lua					\
+	src/undo.lua					\
+	src/window.lua					\
+	src/term_curses.lua					\
+	src/term_minibuf.lua				\
+	src/term_redisplay.lua
 
 LUA_RUNTIME =						\
-	std.lua						\
-	$(zile_LUA)
+	src/std.lua						\
+	$(src_zile_LUA)
 
-dist_pkgdata_DATA =					\
+dist_pkgdata_DATA +=					\
 	$(LUA_RUNTIME)					\
-	loadlua.lua					\
-	default-bindings.el				\
-	dotzile-extra.el
+	src/loadlua.lua					\
+	src/default-bindings.el				\
+	src/dotzile-extra.el
 
 PRODUCTIONSOURCES =					\
 	$(zile_SOURCES)					\
@@ -73,9 +75,9 @@ PRODUCTIONSOURCES =					\
 
 LUA_CLIBS = posix curses bit rex_gnu
 
-loadlua.lua: Makefile.am
+src/loadlua.lua: Makefile.am
 	echo "-- Generated file - do not edit!" > $@
-	for i in $(LUA_CLIBS) $(LUA_RUNTIME); do echo 'require "'`echo $$i | sed -e 's/\\.lua$$//g'`'"' >> $@; done
+	for i in $(LUA_CLIBS) $(LUA_RUNTIME); do echo 'require "'`echo $$i | sed -e 's|^src/||;s|\\.lua$$||'`'"' >> $@; done
 
 install_edit = sed \
 	-e 's|@pkgdatadir[@]|$(pkgdatadir)|g'
@@ -83,30 +85,31 @@ install_edit = sed \
 inplace_edit = sed \
 	-e 's|@pkgdatadir[@]|$(srcdir)|g'
 
-zile: zile.lua Makefile
+src/zile: src/zile.lua Makefile
 	rm -f $@ $@.tmp
 	$(inplace_edit) '$(srcdir)/$@.lua' >$@.tmp
 	mv $@.tmp $@
 	chmod +x $@
 
 install-exec-hook:
-	$(install_edit) '$(srcdir)/zile.lua' >$@.tmp
+	$(install_edit) '$(srcdir)/src/zile.lua' >$@.tmp
 	$(INSTALL_SCRIPT) $@.tmp $(bindir)/zile
 	rm -f $@.tmp
 
-zile.1: zile zile.1.in Makefile
+src/zile.1: src/zile src/zile.1.in Makefile
 	rm -f $@ $@.tmp
 	$(install_edit) '$(srcdir)/$@.in' >$@.tmp
 	mv $@.tmp $@
 
-zile.1.in: zile man-extras zile-help2man-wrapper
-	builddir=$(builddir) $(HELP2MAN) --output=$@ --no-info --name="Zile Is Lossy Emacs" --include $(srcdir)/man-extras $(srcdir)/zile-help2man-wrapper
+src/zile.1.in: src/zile src/man-extras src/zile-help2man-wrapper
+	cd src && \
+	builddir=$(builddir) $(HELP2MAN) --output=zile.1.in --no-info --name="Zile Is Lossy Emacs" --include $(srcdir)/man-extras $(srcdir)/zile-help2man-wrapper
 
-dist_man_MANS = zile.1
+dist_man_MANS = src/zile.1
 
-CLEANFILES = zile
-DISTCLEANFILES = zile.1
-MAINTAINERCLEANFILES = loadlua.lua
+CLEANFILES = src/zile
+DISTCLEANFILES = src/zile.1
+MAINTAINERCLEANFILES = src/loadlua.lua
 
 TESTSOURCES = $(LISP_TESTS) $(LISP_TESTS_ZILE_ONLY) $(TESTSCRIPTS)
 ALLSOURCES = $(TESTSOURCES) $(PRODUCTIONSOURCES)
@@ -130,29 +133,29 @@ check-local:
 	echo $(LISP_TESTS_ZILE_ONLY) | $(LUA_ENV) $(TESTS_VARS) EMACS= xargs $(LUA) "$(srcdir)/run-lisp-tests.lua"
 
 TESTSCRIPTS =						\
-	run-lisp-tests.lua				\
-	test-bad-argument
+	src/run-lisp-tests.lua				\
+	src/test-bad-argument
 
 # FIXME: Find a way of making these work
 #	lisp-tests/disabled/*.el
 
 # FIXME: Make these work in Emacs too
-LISP_TESTS_ZILE_ONLY = $(srcdir)/lisp-tests/zile-only/*.el
+LISP_TESTS_ZILE_ONLY = $(srcdir)/src/lisp-tests/zile-only/*.el
 
-LISP_TESTS = $(srcdir)/lisp-tests/*.el
+LISP_TESTS = $(srcdir)/src/lisp-tests/*.el
 
-LISP_TESTS_OUTPUTS = $(srcdir)/lisp-tests/*.output $(srcdir)/lisp-tests/zile-only/*.output
+LISP_TESTS_OUTPUTS = $(srcdir)/src/lisp-tests/*.output $(srcdir)/src/lisp-tests/zile-only/*.output
 
-EXTRA_DIST =						\
+EXTRA_DIST +=						\
 	$(zile_LUA)					\
-	zile.lua.in					\
-	std.lua						\
+	src/zile.lua.in					\
+	src/std.lua						\
 	$(LISP_TESTS)					\
 	$(LISP_TESTS_ZILE_ONLY)				\
 	$(LISP_TESTS_OUTPUTS)				\
-	lisp-tests/test.input				\
+	src/lisp-tests/test.input				\
 	$(TESTSCRIPTS)					\
-	quit.el						\
-	man-extras					\
-	zile.1.in					\
-	zile-help2man-wrapper
+	src/quit.el						\
+	src/man-extras					\
+	src/zile.1.in					\
+	src/zile-help2man-wrapper
