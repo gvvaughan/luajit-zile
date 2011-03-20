@@ -84,7 +84,7 @@ install_edit = sed \
 	-e 's|@pkgdatadir[@]|$(pkgdatadir)|g'
 
 inplace_edit = sed \
-	-e 's|@pkgdatadir[@]|$(srcdir)|g'
+	-e "s|@pkgdatadir[@]|`cd $(srcdir)/src && pwd`|g"
 
 src/zile: src/zile.lua Makefile
 	rm -f $@ $@.tmp
