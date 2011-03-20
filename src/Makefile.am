@@ -58,7 +58,6 @@ src_zile_LUA =						\
 	src/term_redisplay.lua
 
 LUA_RUNTIME =						\
-	src/std.lua						\
 	src/ldb.lua						\
 	src/ldb-config.lua					\
 	$(src_zile_LUA)
