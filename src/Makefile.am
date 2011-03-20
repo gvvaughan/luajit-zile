@@ -59,6 +59,8 @@ src_zile_LUA =						\
 
 LUA_RUNTIME =						\
 	src/std.lua						\
+	src/ldb.lua						\
+	src/ldb-config.lua					\
 	$(src_zile_LUA)
 
 dist_pkgdata_DATA +=					\
@@ -68,9 +70,9 @@ dist_pkgdata_DATA +=					\
 	src/dotzile-extra.el
 
 PRODUCTIONSOURCES =					\
-	$(zile_SOURCES)					\
-	$(zile_LUA)					\
-	Makefile.am ../Makefile.am ../configure.ac	\
+	$(src_zile_LUA)					\
+	src/ldb-config.lua					\
+	src/Makefile.am Makefile.am configure.ac	\
 	*.el
 
 LUA_CLIBS = posix curses bit rex_gnu
@@ -87,13 +89,13 @@ inplace_edit = sed \
 
 src/zile: src/zile.lua Makefile
 	rm -f $@ $@.tmp
-	$(inplace_edit) '$(srcdir)/$@.lua' >$@.tmp
+	$(inplace_edit) '$(builddir)/$@.lua' >$@.tmp
 	mv $@.tmp $@
 	chmod +x $@
 
 install-exec-hook:
-	$(install_edit) '$(srcdir)/src/zile.lua' >$@.tmp
-	$(INSTALL_SCRIPT) $@.tmp $(bindir)/zile
+	$(install_edit) '$(builddir)/src/zile.lua' >$@.tmp
+	$(INSTALL_SCRIPT) $@.tmp $(DESTDIR)$(bindir)/zile
 	rm -f $@.tmp
 
 src/zile.1: src/zile src/zile.1.in Makefile
@@ -101,7 +103,7 @@ src/zile.1: src/zile src/zile.1.in Makefile
 	$(install_edit) '$(srcdir)/$@.in' >$@.tmp
 	mv $@.tmp $@
 
-src/zile.1.in: src/zile src/man-extras src/zile-help2man-wrapper
+src/zile.1.in: src/main.lua src/man-extras src/zile-help2man-wrapper
 	cd src && \
 	builddir=$(builddir) $(HELP2MAN) --output=zile.1.in --no-info --name="Zile Is Lossy Emacs" --include $(srcdir)/man-extras $(srcdir)/zile-help2man-wrapper
 
@@ -109,7 +111,7 @@ dist_man_MANS = src/zile.1
 
 CLEANFILES = src/zile
 DISTCLEANFILES = src/zile.1
-MAINTAINERCLEANFILES = src/loadlua.lua
+MAINTAINERCLEANFILES = src/loadlua.lua src/zile.1.in
 
 TESTSOURCES = $(LISP_TESTS) $(LISP_TESTS_ZILE_ONLY) $(TESTSCRIPTS)
 ALLSOURCES = $(TESTSOURCES) $(PRODUCTIONSOURCES)
@@ -147,9 +149,8 @@ LISP_TESTS = $(srcdir)/src/lisp-tests/*.el
 LISP_TESTS_OUTPUTS = $(srcdir)/src/lisp-tests/*.output $(srcdir)/src/lisp-tests/zile-only/*.output
 
 EXTRA_DIST +=						\
-	$(zile_LUA)					\
+	$(LUA_RUNTIME)					\
 	src/zile.lua.in					\
-	src/std.lua						\
 	$(LISP_TESTS)					\
 	$(LISP_TESTS_ZILE_ONLY)				\
 	$(LISP_TESTS_OUTPUTS)				\

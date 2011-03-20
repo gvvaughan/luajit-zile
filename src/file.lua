@@ -52,50 +52,33 @@ end
 -- Returns normalized path, or nil if a password entry could not be
 -- read
 function normalize_path (path)
-  -- Prepend cwd if path is relative, and ensure trailing `/'
-  if path[1] ~= "/" and path[1] ~= "~" then
-    path = (posix.getcwd () or "") .. path
-    path = string.gsub (path, "([^/])$", "%1/")
-  end
-
-  -- `//'
-  path = string.gsub (path, "^.*//+", "/")
-
-  -- Deal with `~', `~user', `..', `.'
   local comp = io.splitdir (path)
   local ncomp = {}
-  for _, v in ipairs (comp) do
-    if v == "~" then -- `~'
-      local home = posix.getpasswd (nil, "dir")
-      if home ~= nil then
-        table.insert (ncomp, home)
-      else
-        return nil
-      end
-    else
-      local user = string.match (v, "^~(.+)$")
-      if user ~= nil then -- `~user'
-        local home = posix.getpasswd (user, "dir")
-        if passwd ~= nil then
-          table.insert (ncomp, home)
-        else
+
+  -- Prepend cwd if path is relative
+  if comp[1] ~= "" then
+    comp = list.concat (io.splitdir (posix.getcwd () or ""), comp)
+  end
+
+  -- Deal with `~[user]', `..', `.', `//'
+  for i, v in ipairs (comp) do
+    if v == "" and i > 1 and i < #comp then -- `//'
+      ncomp = {}
+    elseif v == ".." then -- `..'
+      table.remove (ncomp)
+    elseif v ~= "." then -- not `.'
+      if v[1] == "~" then -- `~[user]'
+        ncomp = {}
+        v = posix.getpasswd (string.match (v, "^~(.+)$"), "dir")
+        if v == nil then
           return nil
         end
-      elseif v == ".." then -- `..'
-        table.remove (ncomp)
-      elseif v ~= "." then -- not `.'
-        table.insert (ncomp, v)
       end
+      table.insert (ncomp, v)
     end
   end
 
-  local npath = io.catdir (unpack (ncomp))
-  -- Add back trailing slash if there was one originally and it would
-  -- not be redundant (i.e. path is not "/")
-  if path[-1] == "/" and npath ~= "/" then
-    npath = npath .. "/"
-  end
-  return npath
+  return io.catdir (unpack (ncomp))
 end
 
 -- Return a `~/foo' like path if the user is under his home directory,
@@ -691,8 +674,9 @@ local max_eol_check_count = 3
 local function read_file (filename)
   local h, err = io.open (filename, "r")
   if h == nil then
-    if posix.errno () ~= posix.ENOENT then
-      minibuf_write (string.format ("%s: %s", filename, err))
+    local _, err = posix.errno ()
+    if err ~= posix.ENOENT then
+      minibuf_write (string.format ("%s %s", err, posix.errno ()))
       cur_bp.readonly = true
     end
     return
@@ -709,7 +693,7 @@ local function read_file (filename)
   local first_eol = true
   local this_eol_type
   local eol_len, total_eols = 0, 0
-  local buf = h:read (posix.BUFSIZ)
+  local buf = h:read (posix.BUFSIZ) or ""
   if #buf > 0 then
     local i = 1
     while i <= #buf and total_eols < max_eol_check_count do

@@ -106,7 +106,7 @@ thisflag = 0
 lastflag = 0
 
 
-ZILE_COPYRIGHT_STRING = "Copyright (C) 2010 Free Software Foundation, Inc."
+ZILE_COPYRIGHT_STRING = "Copyright (C) 2011 Free Software Foundation, Inc."
 
 local about_minibuf_str = "Welcome to " .. PACKAGE_NAME .. "!"
 
@@ -372,3 +372,17 @@ function main ()
   -- Tidy and close the terminal.
   term_finish ()
 end
+
+Defun ("debug",
+       {},
+[[
+Enter the debugger.  Zile's debugger is not like Emacs's, principally
+in that it is a Lua debugger (the language in which Zile is written).
+]],
+  true,
+  function ()
+    term_close ()
+    ldb ()
+    term_reopen ()
+  end
+)
