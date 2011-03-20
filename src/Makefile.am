@@ -19,7 +19,7 @@
 # Free Software Foundation, Fifth Floor, 51 Franklin Street, Boston,
 # MA 02111-1301, USA.
 
-LUA_ENV = LUA_INIT= LUA_PATH="$(srcdir)/?.lua"
+LUA_ENV = LUA_INIT= LUA_PATH="$(srcdir)/src/?.lua;;"
 
 bin_SCRIPTS = src/zile
 
@@ -126,12 +126,12 @@ loc-tests:
 loc-all:
 	$(CLOC) $(ALLSOURCES)
 
-TESTS_VARS = srcdir=$(srcdir) builddir=$(builddir)
+TESTS_VARS = srcdir=$(srcdir)/src builddir=$(builddir)
 TESTS_ENVIRONMENT = $(TESTS_VARS)
 
 check-local:
-	echo $(LISP_TESTS) | $(LUA_ENV) $(TESTS_VARS) EMACS="$(EMACS)" xargs $(LUA) "$(srcdir)/run-lisp-tests.lua"
-	echo $(LISP_TESTS_ZILE_ONLY) | $(LUA_ENV) $(TESTS_VARS) EMACS= xargs $(LUA) "$(srcdir)/run-lisp-tests.lua"
+	echo $(LISP_TESTS) | $(LUA_ENV) $(TESTS_VARS) EMACS="$(EMACS)" xargs $(LUA) "$(srcdir)/src/run-lisp-tests.lua"
+	echo $(LISP_TESTS_ZILE_ONLY) | $(LUA_ENV) $(TESTS_VARS) EMACS= xargs $(LUA) "$(srcdir)/src/run-lisp-tests.lua"
 
 TESTSCRIPTS =						\
 	src/run-lisp-tests.lua				\
