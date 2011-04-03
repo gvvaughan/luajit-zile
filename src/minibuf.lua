@@ -1,5 +1,5 @@
 --
--- Copyright (c) 2010 Free Software Foundation, Inc.
+-- Copyright (c) 2010, 2011 Free Software Foundation, Inc.
 --
 -- This file is part of GNU Zile.
 --
@@ -80,9 +80,9 @@ function minibuf_vread_completion (fmt, value, cp, hp, empty_err, invalid_err)
     else
       -- Complete partial words if possible.
       local comp = completion_try (cp, ms)
-      if comp == COMPLETION_MATCHED then
+      if comp == "match" then
         ms = cp.match
-      elseif comp == COMPLETION_NONUNIQUE then
+      elseif comp == "incomplete" then
         popup_completion (cp)
       end
 
@@ -103,30 +103,26 @@ function minibuf_vread_completion (fmt, value, cp, hp, empty_err, invalid_err)
 end
 
 -- Read a filename from the minibuffer.
-function minibuf_read_filename (fmt, value, file)
-  local p
+function minibuf_read_filename (fmt, name, file)
+  name = normalize_path (name)
+  if name then
+    name = compact_path (name)
 
-  local as = value
-  if normalize_path (as) then
-    as = compact_path (as)
-
-    local pos = #as
+    local pos = #name
     if file then
       pos  = pos - #file
     end
-    p = term_minibuf_read (fmt, as, pos, completion_new (true), files_history)
+    name = term_minibuf_read (fmt, name, pos, completion_new (true), files_history)
 
-    if p then
-      local as = p
-      if normalize_path (as) then
-        add_history_element (files_history, p)
-      else
-        p = nil
+    if name then
+      name = normalize_path (name)
+      if name then
+        add_history_element (files_history, name)
       end
     end
   end
 
-  return p
+  return name
 end
 
 function minibuf_read_yesno (fmt)
@@ -163,8 +159,8 @@ function minibuf_read_yn (fmt)
 end
 
 -- Read a string from the minibuffer.
-function minibuf_read (fmt, value)
-  return term_minibuf_read (fmt, value or "", -1)
+function minibuf_read (fmt, value, cp, hp)
+  return term_minibuf_read (fmt, value, -1, cp, hp)
 end
 
 -- Read a non-negative number from the minibuffer.
@@ -186,9 +182,4 @@ function minibuf_read_number (fmt)
   until n
 
   return n
-end
-
--- FIXME: Make all callers use history
-function minibuf_read_completion (fmt, value, cp, hp)
-  return term_minibuf_read (fmt, value, -1, cp, hp)
 end

@@ -1,6 +1,6 @@
 -- Basic movement functions
 --
--- Copyright (c) 2010 Free Software Foundation, Inc.
+-- Copyright (c) 2010, 2011 Free Software Foundation, Inc.
 --
 -- This file is part of GNU Zile.
 --
@@ -26,7 +26,7 @@ Move point to beginning of current line.
 ]],
   true,
   function ()
-    cur_bp.pt = line_beginning_position (get_variable_number ("current-prefix-arg"))
+    cur_bp.pt = line_beginning_position (current_prefix_arg or 1)
     cur_bp.goalc = 0
   end
 )
@@ -38,7 +38,7 @@ Move point to end of current line.
 ]],
   true,
   function ()
-    cur_bp.pt = line_end_position (get_variable_number ("current-prefix-arg"))
+    cur_bp.pt = line_end_position (current_prefix_arg or 1)
     cur_bp.goalc = 1e100 -- FIXME: Use a constant
   end
 )
@@ -48,7 +48,7 @@ local function move_char (dir)
     cur_bp.pt.o = cur_bp.pt.o + dir
     return true
   elseif (dir > 0 and not eobp ()) or (dir < 0 and not bobp ()) then
-    thisflag = bit.bor (thisflag, FLAG_NEED_RESYNC)
+    thisflag.need_resync = true
     if dir > 0 then
       cur_bp.pt.p = cur_bp.pt.p.next
     else
@@ -181,7 +181,7 @@ local function move_line (n)
   end
   goto_goalc ()
 
-  thisflag = bit.bor (thisflag, FLAG_NEED_RESYNC)
+  thisflag.need_resync = true
 
   return ok
 end
@@ -203,7 +203,7 @@ Position 1 is the beginning of the buffer.
           ok = execute_function ("keyboard-quit")
           break
         end
-        n = tonumber (ms, 10);
+        n = tonumber (ms, 10)
         if not n then
           ding ()
         end
@@ -228,7 +228,7 @@ Goto line arg, counting from line 1 at beginning of buffer.
 ]],
   true,
   function (n)
-    n = n or get_variable_number ("current-prefix-arg")
+    n = n or current_prefix_arg
     if not n and interactive then
       n = minibuf_read_number ("Goto line: ")
       if n == "" then
@@ -263,7 +263,7 @@ column, or at the end of the line if it is not long enough.
   true,
   function (n)
     local ok = leT
-    n = n or get_variable_number ("current-prefix-arg")
+    n = n or current_prefix_arg or 1
     if n < 0 or not bobp () then
       ok = execute_with_uniarg (false, n, previous_line, next_line)
     end
@@ -284,7 +284,7 @@ column, or at the end of the line if it is not long enough.
   true,
   function (n)
     local ok = leT
-    n = n or get_variable_number ("current-prefix-arg")
+    n = n or current_prefix_arg or 1
     if n < 0 or not eobp () then
       ok = execute_with_uniarg (false, n, next_line, previous_line)
     end
@@ -297,7 +297,7 @@ column, or at the end of the line if it is not long enough.
 -- Move point to the beginning of the buffer; do not touch the mark.
 function gotobob ()
   cur_bp.pt = point_min ()
-  thisflag = bit.bor (thisflag, FLAG_NEED_RESYNC)
+  thisflag.need_resync = true
 end
 
 Defun ("beginning-of-buffer",
@@ -317,7 +317,7 @@ Move point to the beginning of the buffer; leave mark at previous position.
 -- Move point to the end of the buffer; do not touch the mark.
 function gotoeob ()
   cur_bp.pt = point_max ()
-  thisflag = bit.bor (thisflag, FLAG_NEED_RESYNC)
+  thisflag.need_resync = true
 end
 
 Defun ("end-of-buffer",

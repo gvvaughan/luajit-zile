@@ -1,6 +1,6 @@
 -- Redisplay engine
 --
--- Copyright (c) 2009, 2010 Free Software Foundation, Inc.
+-- Copyright (c) 2009, 2010, 2011 Free Software Foundation, Inc.
 --
 -- This file is part of GNU Zile.
 --
@@ -99,7 +99,7 @@ local function outch (c, font, x)
 
   if c == string.byte ('\t') then
     for w = cur_tab_width - x % cur_tab_width, 1, -1 do
-      term_addch (string.byte (' '))
+      term_addstr (' ')
       x = x + 1
       if x >= tw then
         break
@@ -128,7 +128,7 @@ end
 local function draw_end_of_line (line, wp, lineno, rp, highlight, x, i)
   if x >= term_width () then
     term_move (line, term_width () - 1)
-    term_addch (string.byte ('$'))
+    term_addstr ('$')
   elseif highlight == true then
     while x < wp.ewidth do
       if in_region (lineno, i, rp) then
@@ -206,7 +206,7 @@ local function draw_window (topline, wp)
 
       if wp.start_column > 0 then
         term_move (i, 0)
-        term_addch (string.byte ('$'))
+        term_addstr ('$')
       end
 
       lp = lp.next
@@ -283,9 +283,7 @@ local function draw_status_line (line, wp)
   local pt = window_pt (wp)
   term_attrset (FONT_REVERSE)
   term_move (line, 0)
-  for i = 1, wp.ewidth do
-    term_addch (string.byte ('-'))
-  end
+  term_addstr (string.rep ('-', wp.ewidth))
 
   local eol_type
   if cur_bp.eol == coding_eol_cr then
@@ -308,7 +306,7 @@ local function draw_status_line (line, wp)
   if wp.bp.overwrite then
     as = as .. " Ovwrt"
   end
-  if bit.band (thisflag, FLAG_DEFINING_MACRO) ~= 0 then
+  if thisflag.defining_macro then
     as = as .. " Def"
   end
   if wp.bp.isearch then
@@ -329,8 +327,7 @@ function term_redisplay ()
 
   calculate_start_column (cur_wp)
 
-  local wp = head_wp
-  while wp do
+  for _, wp in ipairs (windows) do
     if wp == cur_wp then
       cur_topline = topline
     end
@@ -344,7 +341,6 @@ function term_redisplay ()
     end
 
     topline = topline + wp.fheight
-    wp = wp.next
   end
 
   -- Redraw cursor.

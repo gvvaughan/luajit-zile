@@ -48,7 +48,7 @@ Whichever character you type to run this command is inserted.
 ]],
   true,
   function ()
-    return execute_with_uniarg (true, get_variable_number ("current-prefix-arg"), self_insert_command);
+    return execute_with_uniarg (true, current_prefix_arg, self_insert_command)
   end
 )
 
@@ -59,13 +59,13 @@ interactive = false
 function process_command ()
   local keys, name = get_key_sequence ()
 
-  thisflag = bit.band (lastflag, FLAG_DEFINING_MACRO)
+  thisflag = {defining_macro = lastflag.defining_macro}
   minibuf_clear ()
 
   if function_exists (name) then
     _this_command = name
     interactive = true
-    execute_function (name, get_variable_number ("current-prefix-arg") or 1, bit.band (lastflag, FLAG_SET_UNIARG) ~= 0)
+    execute_function (name, prefix_arg or 1, lastflag.set_uniarg)
     interactive = false
     _last_command = _this_command
   else
@@ -74,12 +74,8 @@ function process_command ()
 
   -- Only add keystrokes if we were already in macro defining mode
   -- before the function call, to cope with start-kbd-macro.
-  if bit.band (lastflag, FLAG_DEFINING_MACRO) ~= 0 and bit.band (thisflag, FLAG_DEFINING_MACRO) ~= 0 then
+  if lastflag.defining_macro and thisflag.defining_macro then
     add_cmd_to_macro ()
-  end
-
-  if bit.band (thisflag, FLAG_SET_UNIARG) == 0 then
-    set_variable ("current-prefix-arg", tostring (1))
   end
 
   if _last_command ~= "undo" then
@@ -118,8 +114,8 @@ function do_binding_completion (as)
   local key
   local bs = ""
 
-  if bit.band (lastflag, FLAG_SET_UNIARG) ~= 0 then
-    local arg = get_variable_number ("current-prefix-arg")
+  if lastflag.set_uniarg then
+    local arg = prefix_arg
 
     if arg < 0 then
       bs = bs .. "- "
@@ -133,7 +129,7 @@ function do_binding_completion (as)
     until arg == 0
   end
 
-  minibuf_write ((bit.band (lastflag, bit.bor (FLAG_SET_UNIARG, FLAG_UNIARG_EMPTY)) ~= 0 and "C-u " or "") ..
+  minibuf_write (((lastflag.set_uniarg or lastflag.uniarg_empty) and "C-u " or "") ..
                  bs .. as)
   key = getkey ()
   minibuf_clear ()
@@ -231,7 +227,7 @@ message in the buffer.
           minibuf_write (name .. " is not on any key")
         else
           local s = string.format ("%s is on %s", name, g.bindings)
-          if bit.band (lastflag, FLAG_SET_UNIARG) ~= 0 then
+          if lastflag.set_uniarg then
             insert_string (s)
           else
             minibuf_write (s)

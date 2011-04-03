@@ -19,6 +19,8 @@
 -- Free Software Foundation, Fifth Floor, 51 Franklin Street, Boston,
 -- MA 02111-1301, USA.
 
+-- FIXME: Warn when file changes on disk
+
 
 -- Formats of end-of-line
 coding_eol_lf = "\n"
@@ -126,7 +128,7 @@ creating one if none already exists.
 
     if not ms then
       ok = execute_function ("keyboard-quit")
-    elseif ms == "" then
+    elseif ms ~= "" then
       ok = bool_to_lisp (find_file (ms))
     end
 
@@ -242,7 +244,7 @@ Set mark after the inserted text.
 -- Write buffer to given file name with given mode.
 local function raw_write_to_disk (bp, filename, mode)
   local ret = true
-  local h = io.open (filename, "w") -- FIXME: mode
+  local h = io.open (filename, "w") -- FIXME: use posix.open, and use mode
 
   if not h then
     return false
@@ -460,7 +462,7 @@ Interactively, confirmation is required unless you supply a prefix argument.
   true,
   function ()
     return write_buffer (cur_bp, true,
-                         arglist ~= nil and bit.band (lastflag, FLAG_SET_UNIARG) == 0,
+                         arglist ~= nil and not lastflag.set_uniarg,
                          nil, "Write file: ")
   end
 )
@@ -469,8 +471,7 @@ local function save_some_buffers ()
   local none_to_save = true
   local noask = false
 
-  local bp = head_bp
-  while bp do
+  for _, bp in ripairs (buffers) do
     if bp.modified and not bp.nosave then
       local fname = get_buffer_filename_or_name (bp)
 
@@ -508,7 +509,6 @@ local function save_some_buffers ()
         end
       end
     end
-    bp = bp.next
   end
 
   if none_to_save then
@@ -540,8 +540,7 @@ Offer to save each buffer, then kill this Zile process.
       return leNIL
     end
 
-    local bp = head_bp
-    while bp do
+    for _, bp in ipairs (buffers) do
       if bp.modified and not bp.needname then
         while true do
           local ans = minibuf_read_yesno ("Modified buffers exist; exit anyway? (yes or no) ")
@@ -553,10 +552,9 @@ Offer to save each buffer, then kill this Zile process.
           break -- We have found a modified buffer, so stop.
         end
       end
-      bp = bp.next
     end
 
-    thisflag = bit.bor (thisflag, FLAG_QUIT)
+    thisflag.quit = true
   end
 )
 
@@ -632,7 +630,13 @@ Puts mark after the inserted text.
   function (buffer)
     local ok = leT
 
-    local def_bp = cur_bp.next or head_bp
+    local def_bp = buffers[#buffers]
+    for i = 2, #buffers do
+      if buffers[i] == cur_bp then
+        def_bp = buffers[i - 1]
+        break
+      end
+    end
 
     if warn_if_readonly_buffer () then
       return leNIL
@@ -640,7 +644,8 @@ Puts mark after the inserted text.
 
     if not buffer then
       local cp = make_buffer_completion ()
-      buffer = minibuf_read_completion (string.format ("Insert buffer (default %s): ", def_bp.name), "", cp)
+      buffer = minibuf_read (string.format ("Insert buffer (default %s): ", def_bp.name),
+                             "", cp, buffer_name_history)
       if not buffer then
         ok = execute_function ("keyboard-quit")
       end
@@ -745,13 +750,11 @@ local function read_file (filename)
 end
 
 function find_file (filename)
-  local bp = head_bp
-  while bp do
+  for _, bp in ipairs (buffers) do
     if bp.filename == filename then
       switch_to_buffer (bp)
       return true
     end
-    bp = bp.next
   end
 
   if exist_file (filename) and not is_regular_file (filename) then
@@ -759,13 +762,13 @@ function find_file (filename)
     return false
   end
 
-  bp = buffer_new ()
+  local bp = buffer_new ()
   set_buffer_names (bp, filename)
 
   switch_to_buffer (bp)
   read_file (filename)
 
-  thisflag = bit.bor (thisflag, FLAG_NEED_RESYNC)
+  thisflag.need_resync = true
 
   return true
 end
@@ -777,8 +780,7 @@ end
 function zile_exit (doabort)
   io.stderr:write ("Trying to save modified buffers (if any)...\r\n")
 
-  local bp = head_bp
-  while bp do
+  for _, bp in ipairs (buffers) do
     if bp.modified and not bp.nosave then
       local buf, as = ""
       local i
@@ -787,7 +789,6 @@ function zile_exit (doabort)
       io.stderr:write (string.format ("Saving %s...\r\n", buf))
       raw_write_to_disk (bp, buf, "rw-------")
     end
-    bp = bp.next
   end
 
   if doabort then

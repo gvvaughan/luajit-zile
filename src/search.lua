@@ -117,7 +117,7 @@ local function search (pt, s, forward, regexp)
     end
   end
   cur_bp.pt.o = pos - 1
-  thisflag = bit.bor (thisflag, FLAG_NEED_RESYNC)
+  thisflag.need_resync = true
   return true
 end
 
@@ -199,9 +199,13 @@ local function isearch (forward, regexp)
   local last = true
   local buf = ""
   local pattern = ""
-  local old_mark = copy_marker (cur_wp.bp.mark)
   local start = table.clone (cur_bp.pt)
   local cur = table.clone (start)
+
+  local old_mark
+  if cur_wp.bp.mark then
+    old_mark = marker_copy (cur_wp.bp.mark)
+  end
 
   -- I-search mode.
   cur_wp.bp.isearch = true
@@ -232,7 +236,7 @@ local function isearch (forward, regexp)
 
     if c == KBD_CANCEL then
       cur_bp.pt = start
-      thisflag = bit.bor (thisflag, FLAG_NEED_RESYNC)
+      thisflag.need_resync = true
 
       -- Quit.
       execute_function ("keyboard-quit")
@@ -248,7 +252,7 @@ local function isearch (forward, regexp)
         pattern = string.sub (pattern, 1, -2)
         cur = table.clone (start)
         cur_bp.pt = table.clone (start)
-        thisflag = bit.bor (thisflag, FLAG_NEED_RESYNC)
+        thisflag.need_resync = true
       else
         ding ()
       end
@@ -301,7 +305,7 @@ local function isearch (forward, regexp)
       last = true
     end
 
-    if bit.band (thisflag, FLAG_NEED_RESYNC) ~= 0 then
+    if thisflag.need_resync then
       resync_redisplay (cur_wp)
     end
   end
@@ -324,7 +328,7 @@ Type @kbd{C-s} to search again forward, @kbd{C-r} to search again backward.
 ]],
   true,
   function ()
-    return isearch (true, bit.band (lastflag, FLAG_SET_UNIARG) ~= 0)
+    return isearch (true, lastflag.set_uniarg)
   end
 )
 
@@ -340,7 +344,7 @@ Type @kbd{C-r} to search again backward, @kbd{C-s} to search again forward.
 ]],
   true,
   function ()
-    return isearch (false, bit.band (lastflag, FLAG_SET_UNIARG) ~= 0)
+    return isearch (false, lastflag.set_uniarg)
   end
 )
 
@@ -354,7 +358,7 @@ is treated as a regexp.  See @kbd{M-x isearch-forward} for more info.
 ]],
   true,
   function ()
-    return isearch (true, bit.band (lastflag, FLAG_SET_UNIARG) == 0)
+    return isearch (true, not lastflag.set_uniarg)
   end
 )
 
@@ -368,7 +372,7 @@ is treated as a regexp.  See @kbd{M-x isearch-forward} for more info.
 ]],
   true,
   function ()
-    return isearch (false, bit.band (lastflag, FLAG_SET_UNIARG) == 0)
+    return isearch (false, not lastflag.set_uniarg)
   end
 )
 
@@ -404,7 +408,7 @@ what to do with it.
       local c = string.byte (' ')
 
       if not noask then
-        if bit.band (thisflag, FLAG_NEED_RESYNC) ~= 0 then
+        if thisflag.need_resync then
           resync_redisplay (cur_wp)
         end
         while true do
@@ -440,7 +444,7 @@ what to do with it.
       end
     end
 
-    if bit.band (thisflag, FLAG_NEED_RESYNC) ~= 0 then
+    if thisflag.need_resync then
       resync_redisplay (cur_wp)
     end
 

@@ -1,6 +1,6 @@
 -- Buffer-oriented functions
 --
--- Copyright (c) 2010 Free Software Foundation, Inc.
+-- Copyright (c) 2010, 2011 Free Software Foundation, Inc.
 --
 -- This file is part of GNU Zile.
 --
@@ -18,6 +18,12 @@
 -- along with GNU Zile; see the file COPYING.  If not, write to the
 -- Free Software Foundation, Fifth Floor, 51 Franklin Street, Boston,
 -- MA 02111-1301, USA.
+
+-- The buffer list
+buffers = {}
+
+buffer_name_history = history_new ()
+
 
 -- Allocate a new buffer, set the default local variable values, and
 -- insert it into the buffer list.
@@ -48,8 +54,7 @@ function buffer_new ()
   bp.eol = coding_eol_lf
 
   -- Insert into buffer list.
-  bp.next = head_bp
-  head_bp = bp
+  table.insert (buffers, bp)
 
   init_buffer (bp)
 
@@ -193,24 +198,6 @@ function calculate_the_region (rp)
   return true
 end
 
--- Move the selected buffer to head.
-function move_buffer_to_head (bp)
-  local it = head_bp
-  local prev
-  while it do
-    if bp == it then
-      if prev then
-        prev.next = bp.next
-        bp.next = head_bp
-        head_bp = bp
-        break
-      end
-    end
-    prev = it
-    it = it.next
-  end
-end
-
 -- Switch to the specified buffer.
 function switch_to_buffer (bp)
   assert (cur_wp.bp == cur_bp)
@@ -225,9 +212,15 @@ function switch_to_buffer (bp)
   cur_wp.bp = cur_bp
 
   -- Move the buffer to head.
-  move_buffer_to_head (bp)
+  for i = 1, #buffers do
+    if buffers[i] == bp then
+      table.remove (buffers, i)
+      table.insert (buffers, bp)
+      break
+    end
+  end
 
-  thisflag = bit.bor (thisflag, FLAG_NEED_RESYNC)
+  thisflag.need_resync = true
 end
 
 -- Create a buffer name using the file name.
@@ -250,12 +243,10 @@ end
 
 -- Search for a buffer named `name'.
 function find_buffer (name)
-  local bp = head_bp
-  while bp do
+  for _, bp in ipairs (buffers) do
     if bp.name == name then
       return bp
     end
-    bp = bp.next
   end
 end
 
@@ -271,100 +262,61 @@ function set_buffer_names (bp, filename)
   bp.name = make_buffer_name (filename)
 end
 
--- Remove the specified buffer from the buffer list and deallocate
--- its space.  Recreate the scratch buffer when required.
+-- Remove the specified buffer from the buffer list.
+-- Recreate the scratch buffer when required.
 function kill_buffer (kill_bp)
-  local next_bp
-  if kill_bp.next ~= nil then
-    next_bp = kill_bp.next
-  else
-    if kill_bp == head_bp then
-      next_bp = nil
-    else
-      next_bp = head_bp
-    end
-  end
-
   -- Search for windows displaying the buffer to kill.
-  local wp = head_wp
-  while wp do
+  for _, wp in ipairs (windows) do
     if wp.bp == kill_bp then
-      wp.bp = next_bp
       wp.topdelta = 0
       wp.saved_pt = nil
     end
-    wp = wp.next
   end
 
   -- Remove the buffer from the buffer list.
-  if cur_bp == kill_bp then
-    cur_bp = next_bp
-  end
-  if head_bp == kill_bp then
-    head_bp = head_bp.next
-  end
-  local bp = head_bp
-  while bp and bp.next do
-    if bp.next == kill_bp then
-      bp.next = bp.next.next
+  local next_bp = buffers[#buffers]
+  for i = 1, #buffers do
+    if buffers[i] == kill_bp then
+      table.remove (buffers, i)
+      next_bp = buffers[i - 1]
+      if cur_bp == kill_bp then
+        cur_bp = next_bp
+      end
       break
     end
-    bp = bp.next
   end
 
   -- If no buffers left, recreate scratch buffer and point windows at
   -- it.
-  if next_bp == nil then
-    next_bp = create_scratch_buffer ()
-    cur_bp = next_bp
-    head_bp = next_bp
-    local wp = head_wp
-    while wp do
-      wp.bp = head_bp
-      wp = wp.next
+  if #buffers == 0 then
+    table.insert (buffers, create_scratch_buffer ())
+    cur_bp = buffers[1]
+    for _, wp in ipairs (windows) do
+      wp.bp = cur_bp
     end
   end
 
   -- Resync windows that need it.
-  local wp = head_wp
-  while wp do
-    if wp.bp == next_bp then
+  for _, wp in ipairs (windows) do
+    if wp.bp == kill_bp then
+      wp.bp = next_bp
       resync_redisplay (wp)
     end
-    wp = wp.next
   end
 end
 
--- Set the specified buffer temporary flag and move the buffer
+-- Set the specified buffer's temporary flag and move the buffer
 -- to the end of the buffer list.
 function set_temporary_buffer (bp)
   bp.temporary = true
 
-  if bp == head_bp then
-    if head_bp.next == nil then
-      return
-    end
-    head_bp = head_bp.next
-  elseif bp.next == nil then
-    return
-  end
-
-  local bp0 = head_bp
-  while bp0 do
-    if bp0.next == bp then
-      bp0.next = bp0.next.next
+  for i = 1, #buffers do
+    if buffers[i] == bp then
+      table.remove (buffers, i)
       break
     end
-    bp0 = bp0.next
   end
-
-  local bp0 = head_bp
-  while bp0.next do
-    bp0 = bp0.next
-  end
-
-  bp0.next = bp
-  bp.next = nil
+  table.insert (buffers, 1, bp)
 end
 
 -- Print an error message into the echo area and return true
@@ -419,7 +371,8 @@ With a nil argument, kill the current buffer.
 
     if not buffer then
       local cp = make_buffer_completion ()
-      buffer = minibuf_read_completion (string.format ("Kill buffer (default %s): ", cur_bp.name), "", cp)
+      buffer = minibuf_read (string.format ("Kill buffer (default %s): ", cur_bp.name),
+                             "", cp, buffer_name_history)
       if not buffer then
         ok = execute_command ("keyboard-quit")
       end
@@ -448,6 +401,19 @@ With a nil argument, kill the current buffer.
   end
 )
 
+local function buffer_next (this_bp)
+  for i, bp in ipairs (buffers) do
+    if bp == this_bp then
+      if i > 1 then
+        return buffers[i - 1]
+      else
+        return buffers[#buffers]
+      end
+      break
+    end
+  end
+end
+
 Defun ("switch-to-buffer",
        {"string"},
 [[
@@ -456,11 +422,12 @@ Select buffer @i{buffer} in the current window.
   true,
   function (buffer)
     local ok = leT
-    local bp = cur_bp.next or head_bp
+    local bp = buffer_next (cur_bp)
 
     if not buffer then
       local cp = make_buffer_completion ()
-      buffer = minibuf_read_completion (string.format ("Switch to buffer (default %s): ", bp.name), "", cp)
+      buffer = minibuf_read (string.format ("Switch to buffer (default %s): ", bp.name),
+                             "", cp, buffer_name_history)
 
       if not buffer then
         ok = execute_function ("keyboard-quit")

@@ -1,6 +1,6 @@
 -- Completion facility functions
 --
--- Copyright (c) 2007, 2009, 2010 Free Software Foundation, Inc.
+-- Copyright (c) 2007, 2009, 2010, 2011 Free Software Foundation, Inc.
 --
 -- This file is part of GNU Zile.
 --
@@ -28,6 +28,8 @@
 --   poppedup: true if the completion is currently displayed
 --   close: true if the completion window should be closed
 -- }
+-- FIXME: Use Objects here and elsewhere, and add an __index
+-- metamethod that works like strict.lua.
 
 -- Make a new completions table
 function completion_new (filename)
@@ -59,8 +61,7 @@ function completion_write (cp, width)
   return s
 end
 
--- Returns the length of the longest string that is a prefix of
--- both s1 and s2.
+-- Returns the length of the common prefix of s1 and s2.
 local function common_prefix_length (s1, s2)
   local len = math.min (#s1, #s2)
   for i = 1, len do
@@ -113,29 +114,21 @@ local function completion_readdir (cp, path)
   return base
 end
 
--- Match completions
+-- Arguments:
 --
 -- cp - the completions
 -- search - the prefix to search for
 --
--- Returns the base of the search string (the same as the search
--- string except for a filename completion, where it is the basename
--- of the path).
+-- Returns the search status.
 --
 -- The effect on cp is as follows:
 --
---   cp.completions - not modified except for a filename completion,
---     in which case reread
---   cp.matches - replaced with the list of matching completions, sorted
---   cp.match - replaced with the longest common prefix of the matches
+--   completions - reread for filename completion; otherwise unchanged
+--   matches - replaced with the list of matching completions, sorted
+--   match - replaced with the longest common prefix of the matches
 --
 -- To format the completions for a popup, call completion_write
 -- after this function.
-COMPLETION_NOTMATCHED = 0
-COMPLETION_MATCHED = 1
-COMPLETION_MATCHEDNONUNIQUE = 2
-COMPLETION_NONUNIQUE = 3
-
 function completion_try (cp, search)
   cp.matches = {}
 
@@ -143,11 +136,15 @@ function completion_try (cp, search)
     search = completion_readdir (cp, search)
   end
 
+  local fullmatch = false
   for _, v in ipairs (cp.completions) do
     if type (v) == "string" then
       local len = math.min (#v, #search)
       if string.sub (v, 1, len) == string.sub (search, 1, len) then
         table.insert (cp.matches, v)
+        if #v == #search then
+          fullmatch = true
+        end
       end
     end
   end
@@ -159,21 +156,20 @@ function completion_try (cp, search)
     prefix_len = math.min (prefix_len, common_prefix_length (match, v))
   end
   cp.match = string.sub (match, 1, prefix_len)
-  cp.matchsize = prefix_len
 
-  local ret = COMPLETION_NONUNIQUE
+  local ret = "incomplete"
   if #cp.matches == 0 then
-    ret = COMPLETION_NOTMATCHED
+    ret = "no match"
   elseif #cp.matches == 1 then
-    ret = COMPLETION_MATCHED
-  elseif #cp.matches > 1 then
+    ret = "match"
+  elseif fullmatch and #cp.matches > 1 then
     local len = math.min (#search, #cp.match)
     if len > 0 and string.sub (cp.match, 1, len) == string.sub (search, 1, len) then
-      ret = COMPLETION_MATCHEDNONUNIQUE
+      ret = "matches"
     end
   end
 
-  return ret, search
+  return ret
 end
 
 local function write_completion (cp, width)
@@ -183,7 +179,7 @@ end
 -- Popup the completion window.
 function popup_completion (cp)
   cp.poppedup = true
-  if head_wp.next == nil then
+  if #windows == 1 then
     cp.close = true
   end
 
@@ -204,15 +200,13 @@ function minibuf_read_variable_name (fmt)
 
   return minibuf_vread_completion (fmt, "", cp, nil,
                                    "No variable name given",
-                                   "Undefined variable name `%s'");
+                                   "Undefined variable name `%s'")
 end
 
 function make_buffer_completion ()
   local cp = completion_new ()
-  local bp = head_bp
-  while bp do
+  for _, bp in ipairs (buffers) do
     table.insert (cp.completions, bp.buffer_name)
-    bp = bp.next
   end
 
   return cp

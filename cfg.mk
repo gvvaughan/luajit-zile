@@ -22,19 +22,20 @@
 gnulib_dir = $(GNULIB_SRCDIR)
 
 # Set format of NEWS
-old_NEWS_hash := 369bb8fbd9477b007c030a0453449e30
+old_NEWS_hash := 6fee0f9296aa44d95bc6713459442687
 
-# Don't check test outputs or diff patches
-VC_LIST_ALWAYS_EXCLUDE_REGEX = \.(output|diff)$$
+# Don't check test outputs
+VC_LIST_ALWAYS_EXCLUDE_REGEX = \.output$$
+
+# Lua-ish, not GNU-ish, error messages in some internal files
+exclude_file_name_regexp--sc_unmarked_diagnostics = ^src/(std|ldb)\.lua$$
 
 local-checks-to-skip = \
-	sc_cast_of_argument_to_free \
 	sc_bindtextdomain \
 	sc_error_message_period \
 	sc_error_message_uppercase
 
 # Rationale:
 #
-# sc_cast_of_argument_to_free: other warnings of this sort are useful
 # sc_bindtextdomain: Emacs isn't internationalised
 # sc_error_message_{period,uppercase}: Emacs does these

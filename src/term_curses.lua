@@ -1,6 +1,6 @@
 -- Curses terminal
 --
--- Copyright (c) 2009, 2010 Free Software Foundation, Inc.
+-- Copyright (c) 2009, 2010, 2011 Free Software Foundation, Inc.
 --
 -- This file is part of GNU Zile.
 --
@@ -178,7 +178,7 @@ local function get_char ()
 
   if #key_buf > 0 then
     c = key_buf[#key_buf]
-    table.remove (key_buf, #key_buf)
+    table.remove (key_buf)
   else
     c = curses.stdscr ():getch ()
   end

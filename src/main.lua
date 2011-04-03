@@ -78,11 +78,11 @@ KBD_F12 = 283
 -- Miscellaneous stuff.
 
 -- Global flags, stored in thisflag and lastflag.
-FLAG_NEED_RESYNC    = 0x01 -- A resync is required.
-FLAG_QUIT           = 0x02 -- The user has asked to quit.
-FLAG_SET_UNIARG     = 0x04 -- The last command modified the universal arg variable `uniarg'.
-FLAG_UNIARG_EMPTY   = 0x08 -- Current universal arg is just C-u's with no number.
-FLAG_DEFINING_MACRO = 0x10 -- We are defining a macro.
+-- need_resync:    a resync is required.
+-- quit:           the user has asked to quit.
+-- set_uniarg:     the last command modified the universal arg variable `uniarg'.
+-- uniarg_empty:   current universal arg is just C-u's with no number.
+-- defining_macro: we are defining a macro.
 
 -- Zile font codes
 FONT_NORMAL = 0
@@ -93,17 +93,13 @@ WAITKEY_DEFAULT = 20
 
 -- The current window
 cur_wp = nil
--- The first window in list
-head_wp = nil
 
 -- The current buffer
 cur_bp = nil
--- The first buffer in list
-head_bp = nil
 
 -- The global editor flags.
-thisflag = 0
-lastflag = 0
+thisflag = {}
+lastflag = {}
 
 
 ZILE_COPYRIGHT_STRING = "Copyright (C) 2011 Free Software Foundation, Inc."
@@ -135,25 +131,12 @@ local function about_screen ()
 end
 
 local function setup_main_screen ()
-  local last_bp
-  local c = 0
-
-  local bp = head_bp
-  while bp do
-    -- Last buffer that isn't *scratch*.
-    if bp.next and bp.next.next == nil then
-      last_bp = bp
-    end
-    c = c + 1
-    bp = bp.next
-  end
-
   -- *scratch* and two files.
-  if c == 3 then
+  if #buffers == 3 then
     execute_function ("split-window")
-    switch_to_buffer (last_bp)
+    switch_to_buffer (buffers[2])
     execute_function ("other-window")
-  elseif c > 3 then
+  elseif #buffers > 3 then
     -- More than two files.
     execute_function ("list-buffers")
   end
@@ -342,15 +325,15 @@ function main ()
       ok = find_file (arg)
       if ok then
         execute_function ("goto-line", line)
-        lastflag = bit.bor (lastflag, FLAG_NEED_RESYNC)
+        lastflag.need_resync = true
       end
     end
-    if bit.band (thisflag, FLAG_QUIT) ~= 0 then
+    if thisflag.quit then
       break
     end
   end
 
-  lastflag = bit.bor (lastflag, FLAG_NEED_RESYNC)
+  lastflag.need_resync = true
 
   -- Reinitialise the scratch buffer to catch settings
   init_buffer (scratch_bp)
@@ -360,8 +343,8 @@ function main ()
   minibuf_refresh ()
 
   -- Run the main loop.
-  while bit.band (thisflag, FLAG_QUIT) == 0 do
-    if bit.band (lastflag, FLAG_NEED_RESYNC) ~= 0 then
+  while not thisflag.quit do
+    if lastflag.need_resync then
       resync_redisplay (cur_wp)
     end
     term_redisplay ()

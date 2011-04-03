@@ -107,7 +107,7 @@ Put the mark where point is now, and point where the mark is now.
       activate_mark ()
     end
 
-    thisflag = bit.bor (thisflag, FLAG_NEED_RESYNC)
+    thisflag.need_resync = true
   end
 )
 
@@ -119,10 +119,10 @@ With arg, turn Transient Mark mode on if arg is positive, off otherwise.
 ]],
   true,
   function (n)
-    if not n and bit.band (lastflag, FLAG_SET_UNIARG) == 0 then
+    if not n and not lastflag.set_uniarg then
       set_variable ("transient-mark-mode", get_variable_bool ("transient-mark-mode") and "nil" or "t")
     elseif not n then
-      n = get_variable ("current-prefix-arg")
+      n = current_prefix_arg
     end
     if n then
       set_variable ("transient-mark-mode", n > 0 and "t" or "nil")
@@ -198,7 +198,7 @@ by 4 each time.
     -- Need to process key used to invoke universal-argument.
     pushkey (lastkey ())
 
-    thisflag = bit.bor (thisflag, FLAG_UNIARG_EMPTY)
+    thisflag.uniarg_empty = true
 
     local i = 0
     local arg = 1
@@ -216,7 +216,7 @@ by 4 each time.
       -- Digit pressed.
       elseif string.match (string.char (bit.band (key, 0xff)), "%d") then
         local digit = bit.band (key, 0xff) - string.byte ('0')
-        thisflag = bit.band (thisflag, bit.bnot (FLAG_UNIARG_EMPTY))
+        thisflag.uniarg_empty = false
 
         if bit.band (key, KBD_META) ~= 0 then
           as = as .. "ESC"
@@ -244,7 +244,7 @@ by 4 each time.
           as = as .. " -"
           -- The default negative arg is -1, not -4.
           arg = 1
-          thisflag = bit.band (thisflag, bit.bnot (FLAG_UNIARG_EMPTY))
+          thisflag.uniarg_empty = false
         end
       else
         ungetkey (key)
@@ -253,8 +253,8 @@ by 4 each time.
     end
 
     if ok == leT then
-      set_variable ("current-prefix-arg", tostring (arg * sgn))
-      thisflag = bit.bor (thisflag, FLAG_SET_UNIARG)
+      prefix_arg = arg * sgn
+      thisflag.set_uniarg = true
       minibuf_clear ()
     end
 
@@ -283,18 +283,22 @@ local function write_buffers_list (old_wp)
   insert_string ("CRM Buffer                Size  Mode             File\n")
   insert_string ("--- ------                ----  ----             ----\n")
 
+  -- Rotate buffer list to get current buffer at head.
+  local bufs = table.clone (buffers)
+  for i = #buffers, 1, -1 do
+    if buffers[i] == old_wp.bp then
+      break
+    end
+    table.insert (bufs, 1, table.remove (bufs))
+  end
+
   -- Print buffers.
-  local bp = old_wp.bp
-  repeat
+  for _, bp in ripairs (bufs) do
     -- Print all buffers except this one (the *Buffer List*).
     if cur_bp ~= bp then
       print_buf (old_wp.bp, bp)
     end
-    bp = bp.next
-    if not bp then
-      bp = head_bp
-    end
-  until bp == old_wp.bp
+  end
 end
 
 Defun ("list-buffers",
@@ -302,12 +306,12 @@ Defun ("list-buffers",
 [[
 Display a list of names of existing buffers.
 The list is displayed in a buffer named `*Buffer List*'.
-Note that buffers with names starting with spaces are omitted.
 
-@itemize -
-The @samp{M} column contains a @samp{*} for buffers that are modified.
-The @samp{R} column contains a @samp{%} for buffers that are read-only.
-@end itemize
+The C column has a `.' for the buffer from which you came.
+The R column has a `%' if the buffer is read-only.
+The M column has a `*' if it is modified.
+After this come the buffer name, its size in characters,
+its major mode, and the visited file name (if any).
 ]],
   true,
   function ()
@@ -353,8 +357,8 @@ Just C-u as argument means to use the current column.
   true,
   function (n)
     if not n and interactive then
-      if bit.band (lastflag, FLAG_SET_UNIARG) ~= 0 then
-        n = get_variable_number ("current-prefix-arg")
+      if lastflag.set_uniarg then
+        n = current_prefix_arg
       else
         n = minibuf_read_number (string.format ("Set fill-column to (default %d): ", cur_bp.pt.o))
         if not n then -- cancelled
@@ -505,7 +509,7 @@ says to insert the output in the current buffer.
       cmd = minibuf_read_shell_command ()
     end
     if not insert then
-      insert = bit.band (lastflag, FLAG_SET_UNIARG)
+      insert = lastflag.set_uniarg
     end
 
     if cmd then
@@ -539,7 +543,7 @@ The output is available in that buffer in both cases.
       cmd = minibuf_read_shell_command ()
     end
     if not insert then
-      insert = bit.band (lastflag, FLAG_SET_UNIARG)
+      insert = lastflag.set_uniarg
     end
 
     if cmd then
@@ -674,7 +678,7 @@ Precisely, if point is on line I, move to the start of line I + N.
 ]],
   true,
   function (n)
-    n = n or get_variable_number ("current-prefix-arg")
+    n = n or current_prefix_arg
     if n ~= 0 then
       execute_function ("beginning-of-line")
       return execute_with_uniarg (false, n, next_line, previous_line)

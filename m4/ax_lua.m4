@@ -14,15 +14,14 @@
 #
 # DESCRIPTION
 #
-#   Detect Lua interpreter, headers and libraries, optionally
-#   enforcing a particular range of versions. If only one version is
-#   given, then exactly this version is required.
+#   Detect Lua interpreter, headers and libraries, optionally enforcing a
+#   particular range of versions. If only one version is given, then exactly
+#   this version is required.
 #
 #   AX_WITH_LUA searches for a Lua interpreter and defines LUA if found.
 #
-#   AX_PROG_LUA searches for a Lua interpreter in the given version
-#   range, if any, and defines LUA if found, or stops with an error if
-#   not.
+#   AX_PROG_LUA searches for a Lua interpreter in the given version range,
+#   if any, and defines LUA if found, or stops with an error if not.
 #
 #   AX_LUA_VERSION checks that the version of Lua is at least MIN-VERSION
 #   and less than TOO-BIG-VERSION, if given.
@@ -81,7 +80,7 @@
 #   modified version of the Autoconf Macro, you may extend this special
 #   exception to the GPL to apply to your modified version as well.
 
-#serial 10
+#serial 14
 
 dnl Helper function to declare extra options
 AC_DEFUN([_AX_LUA_OPTS],
@@ -123,7 +122,7 @@ AC_DEFUN([AX_LUA_VERSION],
   _AX_LUA_VERSIONS($1, $2)
   AC_MSG_CHECKING([Lua version is in range $1 <= v < $2])
   if test "x$LUA" != x; then
-    lua_text_version=$(LUA_INIT= $LUA -v 2>&1 | head -n 1 | cut -d' ' -f2)
+    lua_text_version=$(LUA_INIT= $LUA -e 'print(_VERSION)' 2>&1 | cut -d' ' -f2)
     case $lua_text_version in
     5.2*)
       lua_version=502
@@ -141,7 +140,7 @@ AC_DEFUN([AX_LUA_VERSION],
       lua_version=-1
       ;;
     esac
-    if test $lua_version -ge "$lua_min_version" -a $lua_version -lt "$lua_max_version"; then
+    if test $lua_version -ge "$lua_min_version" && test $lua_version -lt "$lua_max_version"; then
       AC_MSG_RESULT([yes])
     else
       AC_MSG_RESULT([no])
@@ -197,6 +196,6 @@ int main()
 
 AC_DEFUN([AX_LUA_READLINE],
   [AX_LIB_READLINE
-  if test -n "$ac_cv_header_readline_readline_h" -a -n "$ac_cv_header_readline_history_h"; then
+  if test -n "$ac_cv_header_readline_readline_h" && test -n "$ac_cv_header_readline_history_h"; then
     LUA_LIBS_CFLAGS="-DLUA_USE_READLINE $LUA_LIBS_CFLAGS"
   fi])dnl

@@ -1,6 +1,6 @@
 -- Minibuffer handling
 --
--- Copyright (c) 2010 Free Software Foundation, Inc.
+-- Copyright (c) 2010, 2011 Free Software Foundation, Inc.
 --
 -- This file is part of GNU Zile.
 --
@@ -28,7 +28,7 @@ local function draw_minibuf_read (prompt, value, match, pointo)
 
   if #prompt + pointo + 1 >= w then
     margin = margin + 1
-    term_addch (string.byte ("$"))
+    term_addstr ('$')
     n = pointo - pointo % (w - #prompt - 2)
   end
 
@@ -37,7 +37,7 @@ local function draw_minibuf_read (prompt, value, match, pointo)
 
   if #value - n >= w - #prompt - margin then
     term_move (h - 1, w - 1)
-    term_addch (string.byte ("$"))
+    term_addstr ('$')
   end
 
   term_move (h - 1, #prompt + margin - 1 + pointo % (w - #prompt - margin))
@@ -58,11 +58,11 @@ local function do_minibuf_read (prompt, value, pos, cp, hp)
 
   while true do
     local s
-    if lasttab == COMPLETION_MATCHEDNONUNIQUE then
+    if lasttab == "matches" then
       s = " [Complete, but not unique]"
-    elseif lasttab == COMPLETION_NOTMATCHED then
+    elseif lasttab == "no match" then
       s = " [No match]"
-    elseif lasttab == COMPLETION_MATCHED then
+    elseif lasttab == "match" then
       s = " [Sole completion]"
     else
       s = ""
@@ -162,25 +162,23 @@ local function do_minibuf_read (prompt, value, pos, cp, hp)
       if not cp then
         ding ()
       else
-        if lasttab ~= -1 and lasttab ~= COMPLETION_NOTMATCHED and cp.poppedup then
+        if lasttab ~= -1 and lasttab ~= "no match" and cp.poppedup then
           completion_scroll_up ()
           thistab = lasttab
         else
           thistab = completion_try (cp, as)
-          if thistab == COMPLETION_NONUNIQUE or thistab == COMPLETION_MATCHEDNONUNIQUE then
+          if thistab == "incomplete" or thistab == "matches" then
             popup_completion (cp)
           end
-          if thistab == COMPLETION_NONUNIQUE or thistab == COMPLETION_MATCHEDNONUNIQUE or thistab == COMPLETION_MATCHED then
-            local bs = ""
-            if cp.filename then
-              bs = bs .. cp.path .. string.sub (cp.match, 1, cp.matchsize)
-              if string.sub (as, 1, #bs) ~= bs then
-                thistab = -1
-              end
-              as = bs
-              pos = #as
+          if thistab == "incomplete" or thistab == "matches" or thistab == "match" then
+            local bs = cp.filename and cp.path or ""
+            bs = bs .. cp.match
+            if string.sub (as, 1, #bs) ~= bs then
+              thistab = -1
             end
-          elseif thistab == COMPLETION_NOTMATCHED then
+            as = bs
+            pos = #as
+          elseif thistab == "no match" then
             ding ()
           end
         end
@@ -204,10 +202,7 @@ end
 function term_minibuf_write (s)
   term_move (term_height () - 1, 0)
   term_clrtoeol ()
-
-  for i = 1, math.min (#s, term_width ()) do
-    term_addch (string.byte (s, i))
-  end
+  term_addstr (string.sub (s, 1, math.min (#s, term_width ())))
 end
 
 function term_minibuf_read (prompt, value, pos, cp, hp)
